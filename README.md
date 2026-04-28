@@ -1,44 +1,47 @@
 # AIS Console Receiver
 
-一个独立的 C# 控制台项目，用于：
+Small C# console utility for extracting and decoding AIS messages from:
 
-- 读取 `JRC JHS-183` 的 AIS 数据
-- 从 `pcapng` 测试文件中提取 `!AIVDM / !AIVDO`
-- 自动拼接多段 AIS 报文
-- 在控制台输出 `MMSI / 经纬度 / 航速 / 航向 / 船名 / 呼号 / 目的地` 等信息
+- `pcapng` capture files
+- live UDP multicast traffic
 
-## 项目位置
+Current features:
 
-`D:\ModifyImageMetadata\AisConsoleReceiver`
+- finds `!AIVDM` and `!AIVDO` sentences inside capture data
+- reassembles multipart AIS payloads
+- decodes common AIS message types such as 1, 2, 3, 5, 18, 19, and 24
+- prints fields like `MMSI`, position, speed, heading, ship name, call sign, ship type, and destination
 
-## 测试数据
+## Project Layout
 
-默认测试数据文件：
+- project file: `AisConsoleReceiver.csproj`
+- main program: `Program.cs`
+- sample capture: `20260408AIS-DATA-STREAM.pcapng`
 
-`D:\20260408AIS-DATA-STREAM.pcapng`
+## Run
 
-## 运行方式
+This project currently targets `net8.0`, so you need the .NET 8 SDK/runtime installed to build or run it.
 
-直接解析默认测试文件：
+Read the bundled sample capture:
 
 ```powershell
-dotnet run --project D:\ModifyImageMetadata\AisConsoleReceiver\AisConsoleReceiver.csproj
+dotnet run --project .\AisConsoleReceiver.csproj
 ```
 
-指定测试文件：
+Read a specific capture file:
 
 ```powershell
-dotnet run --project D:\ModifyImageMetadata\AisConsoleReceiver\AisConsoleReceiver.csproj -- --pcap D:\20260408AIS-DATA-STREAM.pcapng
+dotnet run --project .\AisConsoleReceiver.csproj -- --pcap C:\path\to\capture.pcapng
 ```
 
-实时监听 AIS 组播：
+Listen for live multicast AIS packets:
 
 ```powershell
-dotnet run --project D:\ModifyImageMetadata\AisConsoleReceiver\AisConsoleReceiver.csproj -- --listen --group 239.192.0.4 --port 60004 --local-ip 192.168.1.100
+dotnet run --project .\AisConsoleReceiver.csproj -- --listen --group 239.192.0.4 --port 60004 --local-ip 192.168.1.100
 ```
 
-查看帮助：
+Show help:
 
 ```powershell
-dotnet run --project D:\ModifyImageMetadata\AisConsoleReceiver\AisConsoleReceiver.csproj -- --help
+dotnet run --project .\AisConsoleReceiver.csproj -- --help
 ```

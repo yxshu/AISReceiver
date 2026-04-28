@@ -7,7 +7,7 @@ namespace AisConsoleReceiver;
 
 internal static partial class Program
 {
-    private const string DefaultPcapPath = @"D:\20260408AIS-DATA-STREAM.pcapng";
+    private const string DefaultPcapFileName = "20260408AIS-DATA-STREAM.pcapng";
     private const string DefaultGroup = "239.192.0.4";
     private const int DefaultPort = 60004;
     private const string DefaultLocalIp = "192.168.1.100";
@@ -38,20 +38,21 @@ internal static partial class Program
         }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"运行失败: {ex.Message}");
+            Console.Error.WriteLine($"Run failed: {ex.Message}");
             return 1;
         }
     }
 
     private static void RunPcap(AisDecoder decoder, string pcapPath)
     {
-        if (!File.Exists(pcapPath))
+        var resolvedPcapPath = ResolvePcapPath(pcapPath);
+        if (resolvedPcapPath is null)
         {
-            throw new FileNotFoundException($"找不到测试数据文件: {pcapPath}");
+            throw new FileNotFoundException($"Could not find pcap file: {pcapPath}");
         }
 
-        Console.WriteLine($"读取测试数据: {pcapPath}");
-        var bytes = File.ReadAllBytes(pcapPath);
+        Console.WriteLine($"Reading pcap: {resolvedPcapPath}");
+        var bytes = File.ReadAllBytes(resolvedPcapPath);
         var text = Encoding.ASCII.GetString(bytes);
 
         var count = 0;
@@ -66,13 +67,13 @@ internal static partial class Program
         }
 
         Console.WriteLine();
-        Console.WriteLine($"完成。共输出 {count} 条已解码 AIS 消息。");
+        Console.WriteLine($"Done. Decoded {count} AIS messages.");
     }
 
     private static void RunLive(AisDecoder decoder, Options options)
     {
-        Console.WriteLine($"监听组播 {options.Group}:{options.Port}，本地网卡 {options.LocalIp}");
-        Console.WriteLine("按 Ctrl+C 停止。");
+        Console.WriteLine($"Listening on multicast {options.Group}:{options.Port} using local interface {options.LocalIp}");
+        Console.WriteLine("Press Ctrl+C to stop.");
 
         using var udp = new UdpClient(AddressFamily.InterNetwork);
         udp.Client.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
@@ -160,22 +161,24 @@ internal static partial class Program
 
     private static void PrintHelp()
     {
-        Console.WriteLine("AIS 控制台解析工具");
+        var defaultPcap = ResolvePcapPath(DefaultPcapFileName) ?? DefaultPcapFileName;
+
+        Console.WriteLine("AIS console receiver");
         Console.WriteLine();
-        Console.WriteLine("默认行为：读取 D:\\20260408AIS-DATA-STREAM.pcapng 并输出解析结果。");
+        Console.WriteLine($"Default behavior: read {defaultPcap} and print decoded AIS messages.");
         Console.WriteLine();
-        Console.WriteLine("用法:");
+        Console.WriteLine("Usage:");
         Console.WriteLine("  AisConsoleReceiver.exe");
-        Console.WriteLine("  AisConsoleReceiver.exe --pcap D:\\20260408AIS-DATA-STREAM.pcapng");
+        Console.WriteLine("  AisConsoleReceiver.exe --pcap C:\\path\\to\\capture.pcapng");
         Console.WriteLine("  AisConsoleReceiver.exe --listen --group 239.192.0.4 --port 60004 --local-ip 192.168.1.100");
         Console.WriteLine();
-        Console.WriteLine("参数:");
-        Console.WriteLine("  --pcap <path>       指定测试数据 pcapng 文件");
-        Console.WriteLine("  --listen            切换到实时监听模式");
-        Console.WriteLine("  --group <ip>        组播地址，默认 239.192.0.4");
-        Console.WriteLine("  --port <port>       UDP 端口，默认 60004");
-        Console.WriteLine("  --local-ip <ip>     本地网卡 IPv4，默认 192.168.1.100");
-        Console.WriteLine("  --help              显示帮助");
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --pcap <path>       Read a pcapng capture file");
+        Console.WriteLine("  --listen            Listen for live multicast AIS packets");
+        Console.WriteLine("  --group <ip>        Multicast group, default 239.192.0.4");
+        Console.WriteLine("  --port <port>       UDP port, default 60004");
+        Console.WriteLine("  --local-ip <ip>     Local IPv4 interface, default 192.168.1.100");
+        Console.WriteLine("  --help              Show help");
     }
 
     [GeneratedRegex(@"!AI(?:VDM|VDO),[^\r\n*]+\*[0-9A-Fa-f]{2}")]
@@ -185,7 +188,7 @@ internal static partial class Program
     {
         public bool ShowHelp { get; private set; }
         public bool ListenMode { get; private set; }
-        public string PcapPath { get; private set; } = DefaultPcapPath;
+        public string PcapPath { get; private set; } = DefaultPcapFileName;
         public string Group { get; private set; } = DefaultGroup;
         public int Port { get; private set; } = DefaultPort;
         public string LocalIp { get; private set; } = DefaultLocalIp;
@@ -212,16 +215,17 @@ internal static partial class Program
                         options.Group = ReadValue(args, ref i, "--group");
                         break;
                     case "--port":
-                        options.Port = int.Parse(ReadValue(args, ref i, "--port"));
+                        options.Port = ParsePort(ReadValue(args, ref i, "--port"));
                         break;
                     case "--local-ip":
                         options.LocalIp = ReadValue(args, ref i, "--local-ip");
                         break;
                     default:
-                        throw new ArgumentException($"未知参数: {args[i]}");
+                        throw new ArgumentException($"Unknown option: {args[i]}");
                 }
             }
 
+            Validate(options);
             return options;
         }
 
@@ -229,11 +233,34 @@ internal static partial class Program
         {
             if (index + 1 >= args.Length)
             {
-                throw new ArgumentException($"{option} 缺少值");
+                throw new ArgumentException($"Missing value for {option}.");
             }
 
             index++;
             return args[index];
+        }
+
+        private static int ParsePort(string value)
+        {
+            if (!int.TryParse(value, out var port) || port is < 1 or > 65535)
+            {
+                throw new ArgumentException($"Invalid port: {value}");
+            }
+
+            return port;
+        }
+
+        private static void Validate(Options options)
+        {
+            if (!IPAddress.TryParse(options.Group, out var groupAddress) || groupAddress.AddressFamily != AddressFamily.InterNetwork)
+            {
+                throw new ArgumentException($"Invalid multicast IPv4 address: {options.Group}");
+            }
+
+            if (!IPAddress.TryParse(options.LocalIp, out var localAddress) || localAddress.AddressFamily != AddressFamily.InterNetwork)
+            {
+                throw new ArgumentException($"Invalid local IPv4 address: {options.LocalIp}");
+            }
         }
     }
 
@@ -260,6 +287,14 @@ internal static partial class Program
 
         private static DecodedMessage Decode(string bits)
         {
+            if (!HasBits(bits, 38))
+            {
+                return new DecodedMessage
+                {
+                    MessageName = "Truncated AIS payload"
+                };
+            }
+
             var messageType = GetUInt(bits, 0, 6);
             var repeat = GetUInt(bits, 6, 2);
             var mmsi = GetUInt(bits, 8, 30);
@@ -277,16 +312,36 @@ internal static partial class Program
                 case 2:
                 case 3:
                     result.MessageName = "Class A Position Report";
-                    result.NavigationStatus = NavigationStatusName(GetUInt(bits, 38, 4));
+                    if (HasBits(bits, 42))
+                    {
+                        result.NavigationStatus = NavigationStatusName(GetUInt(bits, 38, 4));
+                    }
+
                     FillPosition(result, bits, 61, 89, 50, 116, 128);
                     break;
                 case 5:
                     result.MessageName = "Static and Voyage Related Data";
-                    result.CallSign = GetSixBitText(bits, 70, 42);
-                    result.ShipName = GetSixBitText(bits, 112, 120);
-                    var shipType5 = GetUInt(bits, 232, 8);
-                    result.ShipType = ShipTypeName(shipType5);
-                    result.Destination = GetSixBitText(bits, 302, 120);
+                    if (HasBits(bits, 112))
+                    {
+                        result.CallSign = GetSixBitText(bits, 70, 42);
+                    }
+
+                    if (HasBits(bits, 232))
+                    {
+                        result.ShipName = GetSixBitText(bits, 112, 120);
+                    }
+
+                    if (HasBits(bits, 240))
+                    {
+                        var shipType5 = GetUInt(bits, 232, 8);
+                        result.ShipType = ShipTypeName(shipType5);
+                    }
+
+                    if (HasBits(bits, 422))
+                    {
+                        result.Destination = GetSixBitText(bits, 302, 120);
+                    }
+
                     break;
                 case 18:
                     result.MessageName = "Class B Position Report";
@@ -295,23 +350,47 @@ internal static partial class Program
                 case 19:
                     result.MessageName = "Extended Class B Position Report";
                     FillPosition(result, bits, 57, 85, 46, 112, 124);
-                    result.ShipName = GetSixBitText(bits, 143, 120);
-                    var shipType19 = GetUInt(bits, 263, 8);
-                    result.ShipType = ShipTypeName(shipType19);
+                    if (HasBits(bits, 263))
+                    {
+                        result.ShipName = GetSixBitText(bits, 143, 120);
+                    }
+
+                    if (HasBits(bits, 271))
+                    {
+                        var shipType19 = GetUInt(bits, 263, 8);
+                        result.ShipType = ShipTypeName(shipType19);
+                    }
+
                     break;
                 case 24:
                     result.MessageName = "Class B Static Data";
+                    if (!HasBits(bits, 40))
+                    {
+                        break;
+                    }
+
                     var partNumber = GetUInt(bits, 38, 2);
                     if (partNumber == 0)
                     {
-                        result.ShipName = GetSixBitText(bits, 40, 120);
+                        if (HasBits(bits, 160))
+                        {
+                            result.ShipName = GetSixBitText(bits, 40, 120);
+                        }
                     }
                     else if (partNumber == 1)
                     {
-                        result.CallSign = GetSixBitText(bits, 90, 42);
-                        var shipType24 = GetUInt(bits, 40, 8);
-                        result.ShipType = ShipTypeName(shipType24);
+                        if (HasBits(bits, 48))
+                        {
+                            var shipType24 = GetUInt(bits, 40, 8);
+                            result.ShipType = ShipTypeName(shipType24);
+                        }
+
+                        if (HasBits(bits, 132))
+                        {
+                            result.CallSign = GetSixBitText(bits, 90, 42);
+                        }
                     }
+
                     break;
                 default:
                     result.MessageName = $"AIS Message Type {messageType}";
@@ -323,11 +402,30 @@ internal static partial class Program
 
         private static void FillPosition(DecodedMessage result, string bits, int lonStart, int latStart, int sogStart, int cogStart, int hdgStart)
         {
-            result.Longitude = DecodeLongitude(GetInt(bits, lonStart, 28));
-            result.Latitude = DecodeLatitude(GetInt(bits, latStart, 27));
-            result.SpeedKnots = DecodeSpeed(GetUInt(bits, sogStart, 10));
-            result.CourseDegrees = DecodeCourse(GetUInt(bits, cogStart, 12));
-            result.HeadingDegrees = DecodeHeading(GetUInt(bits, hdgStart, 9));
+            if (HasBits(bits, lonStart + 28))
+            {
+                result.Longitude = DecodeLongitude(GetInt(bits, lonStart, 28));
+            }
+
+            if (HasBits(bits, latStart + 27))
+            {
+                result.Latitude = DecodeLatitude(GetInt(bits, latStart, 27));
+            }
+
+            if (HasBits(bits, sogStart + 10))
+            {
+                result.SpeedKnots = DecodeSpeed(GetUInt(bits, sogStart, 10));
+            }
+
+            if (HasBits(bits, cogStart + 12))
+            {
+                result.CourseDegrees = DecodeCourse(GetUInt(bits, cogStart, 12));
+            }
+
+            if (HasBits(bits, hdgStart + 9))
+            {
+                result.HeadingDegrees = DecodeHeading(GetUInt(bits, hdgStart, 9));
+            }
         }
     }
 
@@ -506,12 +604,41 @@ internal static partial class Program
             builder.Append(Convert.ToString(value, 2).PadLeft(6, '0'));
         }
 
-        if (fillBits > 0)
+        if (fillBits > 0 && builder.Length >= fillBits)
         {
             builder.Length -= fillBits;
         }
 
         return builder.ToString();
+    }
+
+    private static bool HasBits(string bits, int requiredLength) => bits.Length >= requiredLength;
+
+    private static string? ResolvePcapPath(string requestedPath)
+    {
+        if (Path.IsPathRooted(requestedPath))
+        {
+            return File.Exists(requestedPath) ? requestedPath : null;
+        }
+
+        var candidates = new[]
+        {
+            Path.Combine(Environment.CurrentDirectory, requestedPath),
+            Path.Combine(AppContext.BaseDirectory, requestedPath),
+            Path.Combine(AppContext.BaseDirectory, "..", requestedPath),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", requestedPath),
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", requestedPath)
+        };
+
+        foreach (var candidate in candidates.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (File.Exists(candidate))
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     private static int GetUInt(string bits, int start, int length) => Convert.ToInt32(bits.Substring(start, length), 2);
