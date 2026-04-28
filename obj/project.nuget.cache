@@ -1,13 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "qGaau+eBxgY=",
+  "dgSpecHash": "Txr7mMtSb9A=",
   "success": true,
   "projectFilePath": "C:\\Users\\yxshu\\AISReceiver\\AisConsoleReceiver.csproj",
-  "expectedPackageFiles": [
-    "C:\\Users\\yxshu\\.nuget\\packages\\microsoft.netcore.app.ref\\8.0.26\\microsoft.netcore.app.ref.8.0.26.nupkg.sha512",
-    "C:\\Users\\yxshu\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\8.0.26\\microsoft.windowsdesktop.app.ref.8.0.26.nupkg.sha512",
-    "C:\\Users\\yxshu\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\8.0.26\\microsoft.aspnetcore.app.ref.8.0.26.nupkg.sha512",
-    "C:\\Users\\yxshu\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\8.0.26\\microsoft.netcore.app.host.win-x64.8.0.26.nupkg.sha512"
-  ],
+  "expectedPackageFiles": [],
   "logs": []
 }
