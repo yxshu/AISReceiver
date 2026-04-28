@@ -15,7 +15,15 @@
 ## 项目结构
 
 - 项目文件：`AisConsoleReceiver.csproj`
-- 主程序：`Program.cs`
+- 程序入口：`Program.cs`
+- 配置层：`Configuration/Options.cs`
+- 模型层：`Models/AssembledPayload.cs`、`Models/DecodedMessage.cs`、`Models/NmeaSentence.cs`
+- 服务层：`Services/AisDecoder.cs`、`Services/MultipartAssembler.cs`
+- 协议层：
+  - `Protocols/Nmea/NmeaSentenceParser.cs`
+  - `Protocols/Ais/AisPayloadDecoder.cs`
+  - `Protocols/Ais/AisBitDecoder.cs`
+  - `Protocols/Ais/AisCodeTables.cs`
 - 示例抓包：`20260408AIS-DATA-STREAM.pcapng`
 
 ## 运行要求

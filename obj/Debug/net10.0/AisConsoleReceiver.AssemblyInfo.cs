@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("AisConsoleReceiver")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+854b6380abf76b2839f6d459ea4ba47f5f166166")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+488f2cf585ff64a86da664614d8e0372765bb565")]
 [assembly: System.Reflection.AssemblyProductAttribute("AisConsoleReceiver")]
 [assembly: System.Reflection.AssemblyTitleAttribute("AisConsoleReceiver")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
